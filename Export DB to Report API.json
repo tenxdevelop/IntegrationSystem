@@ -1,0 +1,167 @@
+{
+  "name": "Export DB to Report API",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "9685db3b-eca6-4fce-89b3-938f78a7533a",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3af575ab-98ca-49e0-a925-dfcb6a317aae",
+              "name": "baseUrl",
+              "value": "http://212.237.219.35:8080",
+              "type": "string"
+            },
+            {
+              "id": "5404a352-2ed1-48b6-aa6e-42df2e654a83",
+              "name": "studentId",
+              "value": 1,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "2149de59-0401-4cee-b2ba-5349c45d5b5a",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH last_ver AS (\n  SELECT DISTINCT ON (spare_code)\n         spare_code, spare_name, spare_description, spare_type, spare_status,\n         price_raw, quantity, source_updated_at_raw\n  FROM spares_history\n  WHERE is_current = TRUE\n  ORDER BY spare_code, valid_from DESC\n)\nSELECT\n  TRIM(spare_code)            AS \"spareCode\",     \n  spare_name                  AS \"spareName\",\n  spare_description           AS \"spareDescription\",\n  spare_type                  AS \"spareType\",\n  spare_status                AS \"spareStatus\",\n  price_raw                   AS \"price\",\n  quantity,\n  source_updated_at_raw       AS \"updatedAt\"\nFROM last_ver\nORDER BY 1;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        416,
+        0
+      ],
+      "id": "107865c9-f277-4801-87b6-90abfe109b7f",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "FE9u6NtacwtL6L3Y",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "delimiter": ";",
+          "headerRow": false
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        624,
+        0
+      ],
+      "id": "10c5062a-8ea4-4006-9be4-7aa6be85c6ef",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://212.237.219.35:8080/students/1/report/csv",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/csv"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1152,
+        0
+      ],
+      "id": "7b9280e7-3ac6-47b0-8967-16a766a92573",
+      "name": "HTTP Request"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4bd9b5ba-1727-446a-94c8-b418a2aea963",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3f2ea20e6d6620f6e49a117cc382f65a26b3e7e49477dfbefbef94b6e21d12ee"
+  },
+  "id": "Kad71rwZ1Fioes50",
+  "tags": []
+}

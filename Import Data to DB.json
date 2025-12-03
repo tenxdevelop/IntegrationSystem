@@ -1,0 +1,207 @@
+{
+  "name": "Import Data to DB",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        -32
+      ],
+      "id": "2aa4738b-c949-4df3-b2c0-41b8e24b4912",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a801e0df-bbf4-488f-b56f-7adc4d8782ab",
+              "name": "baseUrl",
+              "value": "http://212.237.219.35:8080",
+              "type": "string"
+            },
+            {
+              "id": "8be66b72-3227-4925-bfc8-24438baa9b39",
+              "name": "studentid",
+              "value": 1,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        -32
+      ],
+      "id": "e601e7a4-0c64-4ba4-b3bb-bc1b5d9b3462",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { baseUrl, studentId } = $input.first().json;\nconst root = String(baseUrl).replace(/\\/+$/, '');\n\nasync function pull(startPage) {\n  let page = startPage;\n  const all = [];\n  while (true) {\n    const res = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `${root}/students/1/cms/spares`,\n      qs: { page },\n      json: true,\n      headers: { Accept: 'application/json' },\n    });\n    if (!Array.isArray(res) || res.length === 0) break;\n    all.push(...res);\n    page++;\n  }\n  return all;\n}\n\nlet list = await pull.call(this, 0);\nif (list.length === 0) list = await pull.call(this, 1);\n\nreturn list.map(x => ({ json: x }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        -32
+      ],
+      "id": "f7f5e684-eb64-4a92-868d-2cfd91e40ea5",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const esc = s => String(s ?? '').replace(/'/g, \"''\");\nconst s = $json;\n\nconst priceNum = Number(String(s.price).replace(',', '.'));\nlet uaSql = String(s.updatedAt || '').trim();\nif (uaSql.includes('T')) {\n  uaSql = uaSql.replace('T',' ').replace('Z','');\n  uaSql = uaSql.replace(/(\\.\\d{6})\\d+$/, '$1'); // до 6 знаков для TIMESTAMP\n}\n\nconst priceRaw = String(s.price ?? '');\nconst updatedAtRaw = String(s.updatedAt ?? '');\n\nreturn {\n  json: {\n    ...s,\n    priceNum,\n    updatedAtSql: uaSql,\n    priceRaw,\n    updatedAtRaw,\n    _e: {\n      code:  esc(s.spareCode),\n      name:  esc(s.spareName),\n      descr: esc(s.spareDescription),\n      type:  esc(s.spareType),\n      status:esc(s.spareStatus),\n      updatedAt: esc(uaSql)\n    }\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        -32
+      ],
+      "id": "e7452903-fd66-43f0-bee8-02bd28afc5cf",
+      "name": "Normilize"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\nUPDATE spares_history\n   SET is_current = FALSE,\n       valid_to   = NOW()\n WHERE spare_code = '{{$json[\"_e\"][\"code\"]}}'\n   AND is_current = TRUE\n   AND NOT (\n     spare_name        = '{{$json[\"_e\"][\"name\"]}}' AND\n     spare_description = '{{$json[\"_e\"][\"descr\"]}}' AND\n     spare_type        = '{{$json[\"_e\"][\"type\"]}}' AND\n     spare_status      = '{{$json[\"_e\"][\"status\"]}}' AND\n     price             = {{$json[\"priceNum\"]}} AND\n     quantity          = {{$json[\"quantity\"]}} AND\n     source_updated_at = '{{$json[\"_e\"][\"updatedAt\"]}}'::timestamp\n   );\n\nINSERT INTO spares_history\n(spare_code, spare_name, spare_description, spare_type, spare_status,\n price, quantity, source_updated_at, valid_from, is_current,\n price_raw, source_updated_at_raw)\nSELECT\n  '{{$json[\"_e\"][\"code\"]}}',\n  '{{$json[\"_e\"][\"name\"]}}',\n  '{{$json[\"_e\"][\"descr\"]}}',\n  '{{$json[\"_e\"][\"type\"]}}',\n  '{{$json[\"_e\"][\"status\"]}}',\n  {{$json[\"priceNum\"]}},\n  {{$json[\"quantity\"]}},\n  '{{$json[\"_e\"][\"updatedAt\"]}}'::timestamp,\n  NOW(), TRUE,\n  '{{$json[\"priceRaw\"]}}',\n  '{{$json[\"updatedAtRaw\"]}}'\nWHERE NOT EXISTS (\n  SELECT 1 FROM spares_history\n   WHERE spare_code = '{{$json[\"_e\"][\"code\"]}}'\n     AND is_current = TRUE\n     AND spare_name        = '{{$json[\"_e\"][\"name\"]}}'\n     AND spare_description = '{{$json[\"_e\"][\"descr\"]}}'\n     AND spare_type        = '{{$json[\"_e\"][\"type\"]}}'\n     AND spare_status      = '{{$json[\"_e\"][\"status\"]}}'\n     AND price             = {{$json[\"priceNum\"]}}\n     AND quantity          = {{$json[\"quantity\"]}}\n     AND source_updated_at = '{{$json[\"_e\"][\"updatedAt\"]}}'::timestamp\n);\n\nUPDATE spares_history\n   SET price_raw = '{{$json[\"priceRaw\"]}}',\n       source_updated_at_raw = '{{$json[\"updatedAtRaw\"]}}'\n WHERE spare_code = '{{$json[\"_e\"][\"code\"]}}'\n   AND is_current = TRUE;\n\nINSERT INTO spares_current\n(spare_code, spare_name, spare_description, spare_type, spare_status,\n price, quantity, source_updated_at, price_raw, source_updated_at_raw)\nVALUES\n(\n  '{{$json[\"_e\"][\"code\"]}}',\n  '{{$json[\"_e\"][\"name\"]}}',\n  '{{$json[\"_e\"][\"descr\"]}}',\n  '{{$json[\"_e\"][\"type\"]}}',\n  '{{$json[\"_e\"][\"status\"]}}',\n  {{$json[\"priceNum\"]}},\n  {{$json[\"quantity\"]}},\n  '{{$json[\"_e\"][\"updatedAt\"]}}'::timestamp,\n  '{{$json[\"priceRaw\"]}}',\n  '{{$json[\"updatedAtRaw\"]}}'\n)\nON CONFLICT (spare_code) DO UPDATE SET\n  spare_name        = EXCLUDED.spare_name,\n  spare_description = EXCLUDED.spare_description,\n  spare_type        = EXCLUDED.spare_type,\n  spare_status      = EXCLUDED.spare_status,\n  price             = EXCLUDED.price,\n  quantity          = EXCLUDED.quantity,\n  source_updated_at = EXCLUDED.source_updated_at,\n  price_raw         = EXCLUDED.price_raw,\n  source_updated_at_raw = EXCLUDED.source_updated_at_raw;\n\nCOMMIT;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        624,
+        -32
+      ],
+      "id": "b46ee008-e6c7-4f2c-9bd2-7d71ddcc4a97",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "FE9u6NtacwtL6L3Y",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const src = $items('Normilize');  \n\nconst codes = [...new Set(\n  src\n    .map(i => i.json?._e?.code)\n    .filter(Boolean)\n    .map(c => `'${String(c).replace(/'/g,\"''\")}'`)\n)];\n\nreturn [{ json: { codes } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        -32
+      ],
+      "id": "c5983978-d323-49e4-bff1-81b1e69276cb",
+      "name": "Collect Codes"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\nUPDATE spares_history\n   SET is_current = FALSE,\n       valid_to   = NOW()\n WHERE is_current = TRUE\n   AND spare_code NOT IN ({{ $json[\"codes\"].join(\",\") }});\n\nCOMMIT;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1040,
+        -32
+      ],
+      "id": "362580d0-1a6c-4836-ab03-6e0355ed3ee1",
+      "name": "Close missing",
+      "credentials": {
+        "postgres": {
+          "id": "FE9u6NtacwtL6L3Y",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Normilize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normilize": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Collect Codes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Codes": {
+      "main": [
+        [
+          {
+            "node": "Close missing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "628677c4-998c-4291-8f41-de4b9fc78678",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3f2ea20e6d6620f6e49a117cc382f65a26b3e7e49477dfbefbef94b6e21d12ee"
+  },
+  "id": "fhtvhfVwSqX5KK1D",
+  "tags": []
+}
