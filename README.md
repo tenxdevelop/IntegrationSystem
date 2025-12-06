@@ -57,8 +57,7 @@
    - кодировка по умолчанию UTF-8
 
 3. **Отправка в Report API**  
-   Узел 'HTTP Request' отправляет сформированный CSV в Report API по адресу  
-   'POST http://ip/students/1/report/csv'  
+   Узел 'HTTP Request' отправляет сформированный CSV в Report API
    с заголовком 'Content-Type: text/csv' и телом в виде бинарных данных (поле 'data'). Таким образом система отчётности получает актуальный снимок состояния исторической БД.
 ![export-workflow](https://github.com/user-attachments/assets/1bbf5df7-b5a1-45bf-a4f1-c2e0dcf84198)
 
