@@ -44,7 +44,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH last_ver AS (\n  SELECT DISTINCT ON (spare_code)\n         spare_code, spare_name, spare_description, spare_type, spare_status,\n         price_raw, quantity, source_updated_at_raw\n  FROM spares_history\n  WHERE is_current = TRUE\n  ORDER BY spare_code, valid_from DESC\n)\nSELECT\n  TRIM(spare_code)            AS \"spareCode\",     \n  spare_name                  AS \"spareName\",\n  spare_description           AS \"spareDescription\",\n  spare_type                  AS \"spareType\",\n  spare_status                AS \"spareStatus\",\n  price_raw                   AS \"price\",\n  quantity,\n  source_updated_at_raw       AS \"updatedAt\"\nFROM last_ver\nORDER BY 1;\n",
+        "query": "WITH last_ver AS (\n  SELECT DISTINCT ON (spare_code)\n         spare_code, spare_name, spare_description, spare_type, spare_status,\n         price_raw, quantity, source_updated_at_raw\n  FROM spares_history\n  WHERE is_current = TRUE\n  ORDER BY spare_code, valid_from DESC\n)\nSELECT\n  spare_code            AS \"spareCode\",     \n  spare_name                  AS \"spareName\",\n  spare_description           AS \"spareDescription\",\n  spare_type                  AS \"spareType\",\n  spare_status                AS \"spareStatus\",\n  price_raw                   AS \"price\",\n  quantity,\n  source_updated_at_raw       AS \"updatedAt\"\nFROM last_ver\nORDER BY 1;\n",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
@@ -61,22 +61,6 @@
           "name": "Postgres account"
         }
       }
-    },
-    {
-      "parameters": {
-        "options": {
-          "delimiter": ";",
-          "headerRow": false
-        }
-      },
-      "type": "n8n-nodes-base.convertToFile",
-      "typeVersion": 1.1,
-      "position": [
-        624,
-        0
-      ],
-      "id": "10c5062a-8ea4-4006-9be4-7aa6be85c6ef",
-      "name": "Convert to File"
     },
     {
       "parameters": {
@@ -99,11 +83,24 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        1152,
+        1360,
         0
       ],
       "id": "7b9280e7-3ac6-47b0-8967-16a766a92573",
       "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json);\n\nconst header = [\"spareCode\", \"spareName\", \"spareDescription\", \"spareType\", \"spareStatus\", \"price\", \"quantity\", \"updatedAt\"];\n\nconst csvRows = items.map(row => {\n  return header.map(fieldName => {\n     let val = String(row[fieldName] || '');\n     \n\n     return val.replace(/;/g, ',').replace(/\\n/g, ' ');\n  }).join(';'); \n});\n\nconst csvString = csvRows.join('\\n');\n\nreturn [\n  {\n    json: {\n      info: \"CSV generated successfully\" \n    },\n    binary: {\n      data: {\n        data: Buffer.from(csvString, 'utf8').toString('base64'),\n        mimeType: 'text/csv',\n        fileName: 'report.csv'\n      }\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "bef43350-0566-47aa-bbcb-8233d4dc3aff",
+      "name": "Code in JavaScript"
     }
   ],
   "pinData": {},
@@ -134,14 +131,14 @@
       "main": [
         [
           {
-            "node": "Convert to File",
+            "node": "Code in JavaScript",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Convert to File": {
+    "Code in JavaScript": {
       "main": [
         [
           {
@@ -157,7 +154,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "4bd9b5ba-1727-446a-94c8-b418a2aea963",
+  "versionId": "49582ca6-e343-4448-b605-25743dcbba8e",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "3f2ea20e6d6620f6e49a117cc382f65a26b3e7e49477dfbefbef94b6e21d12ee"
