@@ -44,7 +44,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH last_ver AS (\n  SELECT DISTINCT ON (spare_code)\n         spare_code, spare_name, spare_description, spare_type, spare_status,\n         price_raw, quantity, source_updated_at_raw\n  FROM spares_history\n  WHERE is_current = TRUE\n  ORDER BY spare_code, valid_from DESC\n)\nSELECT\n  spare_code            AS \"spareCode\",     \n  spare_name                  AS \"spareName\",\n  spare_description           AS \"spareDescription\",\n  spare_type                  AS \"spareType\",\n  spare_status                AS \"spareStatus\",\n  price_raw                   AS \"price\",\n  quantity,\n  source_updated_at_raw       AS \"updatedAt\"\nFROM last_ver\nORDER BY 1;\n",
+        "query": "WITH last_ver AS (\n  SELECT DISTINCT ON (spare_code)\n         spare_code, spare_name, spare_description, spare_type, spare_status,\n         price_raw, quantity, source_updated_at_raw\n  FROM spares_history\n  -- ВАЖНО: убираем фильтр is_current = TRUE\n  ORDER BY spare_code, valid_from DESC\n)\nSELECT\n  spare_code            AS \"spareCode\",\n  spare_name            AS \"spareName\",\n  spare_description     AS \"spareDescription\",\n  spare_type            AS \"spareType\",\n  spare_status          AS \"spareStatus\",\n  price_raw             AS \"price\",\n  quantity,\n  source_updated_at_raw AS \"updatedAt\"\nFROM last_ver\nORDER BY spare_code;\n",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
